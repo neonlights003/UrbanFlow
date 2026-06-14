@@ -134,3 +134,8 @@ def health():
         "mode": mode,
         "connected_clients": len(manager.active)
     }
+
+@app.get("/api/anomalies")
+def get_anomalies(limit: int = 20):
+    from anomaly import get_recent_anomalies
+    return get_recent_anomalies(limit)

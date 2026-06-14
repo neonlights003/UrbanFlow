@@ -118,7 +118,7 @@ def get_peak_hours():
 def get_all_tags():
     conn = get_conn()
     rows = conn.execute(
-        "SELECT uid, label, is_active FROM rfid_tags"
+        "SELECT uid, label, is_active, created_at FROM rfid_tags ORDER BY created_at DESC"
     ).fetchall()
     conn.close()
     return [dict(r) for r in rows]

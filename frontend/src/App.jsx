@@ -7,15 +7,18 @@ import EventFeed from "./components/EventFeed";
 import OccupancyChart from "./components/OccupancyChart";
 import PredictionPanel from "./components/PredictionPanel";
 import AccessAlert from "./components/AccessAlert";
+import AnomalyFeed from "./components/AnomalyFeed";
+import RfidManager from "./components/RfidManager";
 
 export default function App() {
   const [slots, setSlots] = useState({
     A1:"FREE", A2:"FREE", A3:"FREE", A4:"FREE", A5:"FREE"
   });
   const [gateStatus, setGateStatus] = useState("CLOSED");
-  const [events, setEvents] = useState([]);
-  const [alert, setAlert] = useState(null);
-  // alert shape: { type: "GRANTED" | "DENIED", uid, label }
+  const [events, setEvents]         = useState([]);
+  const [alert, setAlert]           = useState(null);
+  const [anomalies, setAnomalies]   = useState([]);
+  const [showRfidManager, setShowRfidManager] = useState(false);
 
   const isDuplicate = useDedupe(800);
 
@@ -30,10 +33,10 @@ export default function App() {
 
   function triggerAlert(type, uid, label) {
     setAlert({ type, uid, label });
-    // Auto-dismiss after 4 seconds
     setTimeout(() => setAlert(null), 4000);
   }
 
+  // Load initial state
   useEffect(() => {
     fetch("http://localhost:8000/api/slots")
       .then((r) => r.json())
@@ -43,6 +46,11 @@ export default function App() {
         setSlots(map);
       })
       .catch((e) => console.error("[App] Failed to load slots:", e));
+
+    fetch("http://localhost:8000/api/anomalies")
+      .then((r) => r.json())
+      .then(setAnomalies)
+      .catch(() => {});
   }, []);
 
   const handleMessage = useCallback((type, data) => {
@@ -68,8 +76,12 @@ export default function App() {
         "RFID",
         `Card ${data.uid.slice(0, 8)}... → ${data.result} (${data.label})`
       );
-      // Trigger the visual alert
       triggerAlert(data.result, data.uid, data.label);
+    }
+
+    if (type === "anomaly") {
+      setAnomalies((prev) => [data, ...prev.slice(0, 19)]);
+      addEvent("ANOMALY", `${data.code}: ${data.message.slice(0, 40)}...`);
     }
   }, []);
 
@@ -77,15 +89,13 @@ export default function App() {
 
   return (
     <div className={`min-h-screen text-white p-6 space-y-4 transition-colors duration-300 ${
-      alert?.type === "DENIED"
-        ? "bg-red-950"
-        : alert?.type === "GRANTED"
-        ? "bg-green-950"
-        : "bg-gray-950"
+      alert?.type === "DENIED"   ? "bg-red-950"
+      : alert?.type === "GRANTED" ? "bg-green-950"
+      : "bg-gray-950"
     }`}>
 
-      {/* Access Alert Banner */}
       <AccessAlert alert={alert} onDismiss={() => setAlert(null)} />
+      <RfidManager isOpen={showRfidManager} onClose={() => setShowRfidManager(false)} />
 
       {/* Header */}
       <div className="flex justify-between items-center">
@@ -98,6 +108,12 @@ export default function App() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowRfidManager(true)}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold bg-blue-900/50 border border-blue-700 text-blue-400 hover:bg-blue-800/50 transition-colors"
+          >
+            💳 Manage RFIDs
+          </button>
           <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold border ${
             connected
               ? "bg-green-950 border-green-700 text-green-400"
@@ -110,7 +126,7 @@ export default function App() {
           </div>
           <div className="text-xs text-gray-600">
             {new Date().toLocaleDateString("en-IN", {
-              weekday: "short", day: "numeric", month: "short"
+              weekday:"short", day:"numeric", month:"short"
             })}
           </div>
         </div>
@@ -118,6 +134,7 @@ export default function App() {
 
       <StatsRow slots={slots} gateStatus={gateStatus} />
 
+      {/* Slot grid + Event feed */}
       <div className="grid grid-cols-3 gap-4">
         <div className="col-span-2">
           <SlotGrid slots={slots} />
@@ -127,9 +144,11 @@ export default function App() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      {/* Chart + Prediction + Anomalies */}
+      <div className="grid grid-cols-3 gap-4">
         <OccupancyChart />
         <PredictionPanel slots={slots} />
+        <AnomalyFeed anomalies={anomalies} />
       </div>
 
     </div>

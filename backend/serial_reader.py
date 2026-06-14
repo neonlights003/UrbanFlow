@@ -1,6 +1,7 @@
 import threading
 import time
 from database import update_slot, log_rfid, log_gate, get_tag
+from anomaly import check_slot_anomaly, check_lot_full, check_repeated_denial
 
 # ------------------------------------------------------------------
 # CONFIG — change these three lines only
@@ -139,6 +140,14 @@ class SerialReader:
         update_slot(slot_id, status)
         self.broadcast("slot_update", {"slot": slot_id, "status": status})
 
+        # Anomaly checks
+        check_slot_anomaly(slot_id, status, self.broadcast)
+
+        # Check lot full — get current slot states
+        from database import get_all_slots
+        all_slots = {s["id"]: s["status"] for s in get_all_slots()}
+        check_lot_full(all_slots, self.broadcast)
+
     def _handle_rfid(self, message):
         parts = message.split(":")
         if len(parts) < 2:
@@ -171,6 +180,9 @@ class SerialReader:
             "result": result,
             "label": label
         })
+
+        # Anomaly check
+        check_repeated_denial(uid, result, self.broadcast)
 
     def _handle_gate(self, message):
         parts = message.split(":")
