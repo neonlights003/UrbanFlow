@@ -6,6 +6,7 @@ import StatsRow from "./components/StatsRow";
 import EventFeed from "./components/EventFeed";
 import OccupancyChart from "./components/OccupancyChart";
 import PredictionPanel from "./components/PredictionPanel";
+import AccessAlert from "./components/AccessAlert";
 
 export default function App() {
   const [slots, setSlots] = useState({
@@ -13,6 +14,9 @@ export default function App() {
   });
   const [gateStatus, setGateStatus] = useState("CLOSED");
   const [events, setEvents] = useState([]);
+  const [alert, setAlert] = useState(null);
+  // alert shape: { type: "GRANTED" | "DENIED", uid, label }
+
   const isDuplicate = useDedupe(800);
 
   function addEvent(type, text) {
@@ -22,6 +26,12 @@ export default function App() {
       { type, text, time: new Date().toLocaleTimeString() },
       ...prev.slice(0, 49),
     ]);
+  }
+
+  function triggerAlert(type, uid, label) {
+    setAlert({ type, uid, label });
+    // Auto-dismiss after 4 seconds
+    setTimeout(() => setAlert(null), 4000);
   }
 
   useEffect(() => {
@@ -58,13 +68,26 @@ export default function App() {
         "RFID",
         `Card ${data.uid.slice(0, 8)}... → ${data.result} (${data.label})`
       );
+      // Trigger the visual alert
+      triggerAlert(data.result, data.uid, data.label);
     }
   }, []);
 
   const connected = useWebSocket(handleMessage);
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white p-6 space-y-4">
+    <div className={`min-h-screen text-white p-6 space-y-4 transition-colors duration-300 ${
+      alert?.type === "DENIED"
+        ? "bg-red-950"
+        : alert?.type === "GRANTED"
+        ? "bg-green-950"
+        : "bg-gray-950"
+    }`}>
+
+      {/* Access Alert Banner */}
+      <AccessAlert alert={alert} onDismiss={() => setAlert(null)} />
+
+      {/* Header */}
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-green-400 tracking-tight">
@@ -108,6 +131,7 @@ export default function App() {
         <OccupancyChart />
         <PredictionPanel slots={slots} />
       </div>
+
     </div>
   );
 }
