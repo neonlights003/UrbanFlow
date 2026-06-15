@@ -9,7 +9,8 @@ from anomaly import check_slot_anomaly, check_lot_full, check_repeated_denial
 DEMO = False   # True = scripted demo sequence (for presentation)
 MOCK = False   # True = random mock, False = real Arduino
 PORT = "COM3"  # Windows COM port for Arduino
-BAUD = 9600    # Must match Arduino Serial.begin(9600)
+BAUD = 9600    # Matches Arduino Serial.begin(9600)
+TOTAL_SLOTS = 4  # Yashika's hardware has 4 physical bays
 # ------------------------------------------------------------------
 
 RFID_DEBOUNCE_SECONDS = 2
