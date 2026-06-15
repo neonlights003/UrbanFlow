@@ -1,116 +1,94 @@
 import { useEffect, useState } from "react";
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  Tooltip,
-} from "chart.js";
+import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Tooltip } from "chart.js";
 import { Bar } from "react-chartjs-2";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip);
 
 export default function OccupancyChart() {
   const [chartData, setChartData] = useState(null);
-  const [peak, setPeak]           = useState(null);
+  const [peak, setPeak] = useState(null);
 
   useEffect(() => {
     fetch("http://localhost:8000/api/analytics/peak-hours")
-      .then((r) => r.json())
-      .then((data) => {
-        const hours  = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"));
+      .then(r => r.json())
+      .then(data => {
+        const hours  = Array.from({length:24},(_,i)=>String(i).padStart(2,"0"));
         const counts = hours.map(h => {
-          const found = data.find(d => d.hour === h);
-          return found ? found.count : 0;
+          const f = data.find(d => d.hour===h);
+          return f ? f.count : 0;
         });
-
-        const maxVal = Math.max(...counts, 1);
-        const peakHour = hours[counts.indexOf(maxVal)];
-        setPeak({ hour: `${peakHour}:00`, count: maxVal });
+        const maxVal  = Math.max(...counts, 1);
+        const peakIdx = counts.indexOf(maxVal);
+        setPeak({ hour:`${hours[peakIdx]}:00`, count:maxVal });
 
         setChartData({
-          labels: hours.map(h => `${h}h`),
-          datasets: [{
+          labels: hours.map(h=>`${h}h`),
+          datasets:[{
             data: counts,
-            // Amber gradient — brightest at peak
             backgroundColor: counts.map(c =>
-              c === maxVal      ? "#d97706" :
-              c > maxVal * 0.6  ? "#f59e0b" :
-              c > maxVal * 0.3  ? "#92400e" :
-                                  "#1c1008"
+              c===maxVal       ? "rgba(245,158,11,0.85)" :
+              c>maxVal*0.6     ? "rgba(245,158,11,0.45)" :
+              c>maxVal*0.25    ? "rgba(245,158,11,0.22)" :
+                                 "rgba(255,255,255,0.05)"
             ),
             borderRadius: 5,
             borderSkipped: false,
           }],
         });
-      })
-      .catch(() => {});
+      }).catch(()=>{});
   }, []);
 
   const options = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
-      legend: { display: false },
+      legend: { display:false },
       tooltip: {
-        backgroundColor: "#1a1a1a",
-        borderColor: "rgba(255,255,255,0.08)",
-        borderWidth: 1,
-        titleColor: "#f5f0e8",
-        bodyColor: "#9d9080",
-        callbacks: {
-          label: ctx => `  ${ctx.raw} entries`,
-        }
+        backgroundColor:"rgba(10,10,12,0.95)",
+        borderColor:"rgba(255,255,255,0.08)",
+        borderWidth:1,
+        titleColor:"rgba(255,255,255,0.9)",
+        bodyColor:"rgba(255,255,255,0.45)",
+        padding:10,
+        callbacks: { label: ctx=>`  ${ctx.raw} entries` }
       }
     },
     scales: {
       x: {
-        ticks: { color: "#5c5248", font: { size: 9 }, maxTicksLimit: 12 },
-        grid:  { color: "rgba(255,255,255,0.03)" },
-        border: { color: "rgba(255,255,255,0.05)" },
+        ticks:  { color:"rgba(255,255,255,0.2)", font:{size:9}, maxTicksLimit:12 },
+        grid:   { color:"rgba(255,255,255,0.03)" },
+        border: { color:"rgba(255,255,255,0.05)" },
       },
       y: {
-        ticks: { color: "#5c5248", font: { size: 9 } },
-        grid:  { color: "rgba(255,255,255,0.03)" },
-        border: { color: "rgba(255,255,255,0.05)" },
+        ticks:  { color:"rgba(255,255,255,0.2)", font:{size:9} },
+        grid:   { color:"rgba(255,255,255,0.03)" },
+        border: { color:"rgba(255,255,255,0.05)" },
         beginAtZero: true,
-      },
-    },
+      }
+    }
   };
 
   return (
-    <div className="card" style={{ padding:"20px" }}>
+    <div className="glass" style={{ padding:"20px 22px" }}>
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"16px" }}>
-        <span style={{ fontSize:"11px", color:"var(--text-muted)", fontWeight:"600", letterSpacing:"0.1em" }}>
-          PEAK HOUR ANALYTICS
-        </span>
+        <p className="label">PEAK HOUR ANALYTICS</p>
         {peak && peak.count > 0 && (
           <span style={{
-            fontSize:"10px", fontWeight:"600",
+            fontSize:"10px", fontWeight:"700",
             padding:"2px 10px", borderRadius:"99px",
-            background:"var(--amber-glow)",
-            border:"1px solid rgba(217,119,6,0.25)",
-            color:"var(--amber-light)"
-          }}>
-            Peak: {peak.hour} · {peak.count} entries
-          </span>
+            background:"rgba(245,158,11,0.1)", border:"1px solid rgba(245,158,11,0.2)",
+            color:"var(--amber)"
+          }}>Peak {peak.hour} · {peak.count} entries</span>
         )}
       </div>
-
-      <div style={{ height:"180px" }}>
-        {chartData ? (
-          <Bar data={chartData} options={options} />
-        ) : (
-          <div style={{
-            height:"100%", display:"flex", alignItems:"center", justifyContent:"center",
-            color:"var(--text-muted)", fontSize:"12px"
-          }}>
-            Loading chart…
-          </div>
-        )}
+      <div style={{ height:"160px" }}>
+        {chartData
+          ? <Bar data={chartData} options={options} />
+          : <div style={{ height:"100%", display:"flex", alignItems:"center", justifyContent:"center",
+              color:"rgba(255,255,255,0.15)", fontSize:"12px" }}>Loading…</div>
+        }
       </div>
-
-      <p style={{ fontSize:"10px", color:"var(--text-muted)", marginTop:"10px" }}>
+      <p style={{ fontSize:"10px", color:"rgba(255,255,255,0.2)", marginTop:"10px" }}>
         Vehicle entries per hour — today
       </p>
     </div>
