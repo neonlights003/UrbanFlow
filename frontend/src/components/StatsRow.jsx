@@ -1,51 +1,68 @@
 export default function StatsRow({ slots, gateStatus }) {
-  const total = 5;
+  const total    = 4;
   const occupied = Object.values(slots).filter((s) => s === "OCCUPIED").length;
   const available = total - occupied;
-  const occupancyPct = Math.round((occupied / total) * 100);
+  const pct = Math.round((occupied / total) * 100);
 
-  const stats = [
-    { label: "Total Capacity", value: total, color: "text-white" },
-    { label: "Occupied", value: occupied, color: "text-red-400" },
-    { label: "Available", value: available, color: "text-green-400" },
-    {
-      label: "Gate Status",
-      value: gateStatus,
-      color: gateStatus === "OPENED" ? "text-green-400" : "text-yellow-400",
-    },
-  ];
+  const gateOpen = gateStatus === "OPENED";
 
   return (
-    <div className="grid grid-cols-4 gap-4">
-      {stats.map((s) => (
-        <div
-          key={s.label}
-          className="bg-gray-900 rounded-2xl p-4 border border-gray-800"
-        >
-          <p className="text-gray-400 text-xs tracking-wider">{s.label}</p>
-          <p className={`text-3xl font-bold mt-1 ${s.color}`}>{s.value}</p>
-        </div>
-      ))}
+    <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:"12px" }}>
 
-      {/* Occupancy bar — spans full width */}
-      <div className="col-span-4 bg-gray-900 rounded-2xl p-4 border border-gray-800">
-        <div className="flex justify-between text-xs text-gray-400 mb-2">
-          <span>Occupancy</span>
-          <span>{occupancyPct}%</span>
-        </div>
-        <div className="w-full bg-gray-800 rounded-full h-3">
-          <div
-            className={`h-3 rounded-full transition-all duration-700 ${
-              occupancyPct > 80
-                ? "bg-red-500"
-                : occupancyPct > 50
-                ? "bg-yellow-500"
-                : "bg-green-500"
-            }`}
-            style={{ width: `${occupancyPct}%` }}
-          />
-        </div>
+      {/* Total */}
+      <div className="card" style={{ padding:"16px 20px" }}>
+        <p style={{ fontSize:"11px", color:"var(--text-muted)", letterSpacing:"0.08em", marginBottom:"8px" }}>
+          CAPACITY
+        </p>
+        <p style={{ fontSize:"32px", fontWeight:"800", color:"var(--text-primary)", letterSpacing:"-0.03em", lineHeight:1 }}>
+          {total}
+        </p>
+        <p style={{ fontSize:"11px", color:"var(--text-muted)", marginTop:"4px" }}>total bays</p>
       </div>
+
+      {/* Occupied */}
+      <div className="card" style={{ padding:"16px 20px", background: occupied > 0 ? "rgba(239,68,68,0.05)" : undefined, borderColor: occupied > 0 ? "rgba(239,68,68,0.2)" : undefined }}>
+        <p style={{ fontSize:"11px", color:"var(--text-muted)", letterSpacing:"0.08em", marginBottom:"8px" }}>
+          OCCUPIED
+        </p>
+        <p style={{ fontSize:"32px", fontWeight:"800", color: occupied > 0 ? "#f87171" : "var(--text-secondary)", letterSpacing:"-0.03em", lineHeight:1 }}>
+          {occupied}
+        </p>
+        <p style={{ fontSize:"11px", color:"var(--text-muted)", marginTop:"4px" }}>{pct}% utilisation</p>
+      </div>
+
+      {/* Available */}
+      <div className="card" style={{ padding:"16px 20px", background: available > 0 ? "rgba(16,185,129,0.05)" : undefined, borderColor: available > 0 ? "rgba(16,185,129,0.2)" : undefined }}>
+        <p style={{ fontSize:"11px", color:"var(--text-muted)", letterSpacing:"0.08em", marginBottom:"8px" }}>
+          AVAILABLE
+        </p>
+        <p style={{ fontSize:"32px", fontWeight:"800", color: available > 0 ? "#34d399" : "var(--text-secondary)", letterSpacing:"-0.03em", lineHeight:1 }}>
+          {available}
+        </p>
+        <p style={{ fontSize:"11px", color:"var(--text-muted)", marginTop:"4px" }}>
+          {available === 0 ? "lot full" : "open bays"}
+        </p>
+      </div>
+
+      {/* Gate */}
+      <div className="card" style={{
+        padding:"16px 20px",
+        background: gateOpen ? "rgba(16,185,129,0.05)" : "rgba(217,119,6,0.04)",
+        borderColor: gateOpen ? "rgba(16,185,129,0.2)" : "rgba(217,119,6,0.15)"
+      }}>
+        <p style={{ fontSize:"11px", color:"var(--text-muted)", letterSpacing:"0.08em", marginBottom:"8px" }}>
+          GATE
+        </p>
+        <p style={{ fontSize:"32px", fontWeight:"800", letterSpacing:"-0.03em", lineHeight:1,
+          color: gateOpen ? "#34d399" : "#f59e0b"
+        }}>
+          {gateOpen ? "OPEN" : "CLOSED"}
+        </p>
+        <p style={{ fontSize:"11px", color:"var(--text-muted)", marginTop:"4px" }}>
+          {gateOpen ? "vehicle in transit" : "barrier secured"}
+        </p>
+      </div>
+
     </div>
   );
 }

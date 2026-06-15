@@ -1,76 +1,48 @@
-import { useEffect, useState } from "react";
-
 export default function AccessAlert({ alert, onDismiss }) {
-  const [visible, setVisible] = useState(false);
-
-  useEffect(() => {
-    if (alert) {
-      setVisible(true);
-    } else {
-      setVisible(false);
-    }
-  }, [alert]);
-
   if (!alert) return null;
 
   const granted = alert.type === "GRANTED";
 
   return (
-    <div className={`
-      fixed top-0 left-0 right-0 z-50
-      transform transition-all duration-500 ease-out
-      ${visible ? "translate-y-0 opacity-100" : "-translate-y-full opacity-0"}
-    `}>
-      <div className={`
-        w-full px-6 py-4 flex items-center justify-between
-        ${granted
-          ? "bg-green-500 text-white"
-          : "bg-red-500 text-white"
-        }
-      `}>
-        {/* Left: icon + message */}
-        <div className="flex items-center gap-4">
-          <span className="text-4xl">
-            {granted ? "✅" : "🚫"}
-          </span>
-          <div>
-            <p className="text-xl font-bold tracking-wide">
-              {granted ? "ACCESS GRANTED" : "ACCESS DENIED"}
-            </p>
-            <p className="text-sm opacity-90">
-              {granted
-                ? `Vehicle "${alert.label}" authenticated — gate opening`
-                : `Unregistered card ${alert.uid.slice(0,8)}... — entry blocked`
-              }
-            </p>
-          </div>
-        </div>
+    <div className="alert-enter" style={{
+      position: "fixed", top: 0, left: 0, right: 0, zIndex: 100,
+      padding: "16px 24px",
+      background: granted
+        ? "linear-gradient(90deg, rgba(16,185,129,0.95), rgba(5,150,105,0.95))"
+        : "linear-gradient(90deg, rgba(220,38,38,0.95), rgba(185,28,28,0.95))",
+      backdropFilter: "blur(12px)",
+      borderBottom: `1px solid ${granted ? "rgba(52,211,153,0.3)" : "rgba(252,165,165,0.3)"}`,
+      display: "flex", alignItems: "center", gap: "16px"
+    }}>
 
-        {/* Right: auto-dismiss bar + close */}
-        <div className="flex items-center gap-4">
-          <div className="w-32 h-1.5 bg-white/30 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-white rounded-full"
-              style={{
-                animation: "shrink 4s linear forwards"
-              }}
-            />
-          </div>
-          <button
-            onClick={onDismiss}
-            className="text-white/70 hover:text-white text-xl font-bold"
-          >
-            ✕
-          </button>
-        </div>
+      <div style={{
+        width:"40px", height:"40px", borderRadius:"12px",
+        background:"rgba(255,255,255,0.15)",
+        display:"flex", alignItems:"center", justifyContent:"center",
+        fontSize:"20px", flexShrink:0
+      }}>
+        {granted ? "✓" : "✕"}
       </div>
 
-      <style>{`
-        @keyframes shrink {
-          from { width: 100%; }
-          to   { width: 0%; }
-        }
-      `}</style>
+      <div style={{ flex:1 }}>
+        <p style={{ fontWeight:"700", fontSize:"15px", color:"#fff", letterSpacing:"-0.01em" }}>
+          Access {granted ? "Granted" : "Denied"}
+        </p>
+        <p style={{ fontSize:"12px", color:"rgba(255,255,255,0.7)", marginTop:"1px" }}>
+          {granted ? `${alert.label} — gate opening` : `Unknown card ${alert.uid?.slice(0,8)}… — access blocked`}
+        </p>
+      </div>
+
+      {/* Auto-dismiss bar */}
+      <div style={{ width:"80px", height:"3px", borderRadius:"99px", background:"rgba(255,255,255,0.2)", overflow:"hidden" }}>
+        <div className="shrink-bar" style={{ height:"100%", background:"rgba(255,255,255,0.7)", borderRadius:"99px" }} />
+      </div>
+
+      <button onClick={onDismiss} style={{
+        background:"rgba(255,255,255,0.15)", border:"none", cursor:"pointer",
+        color:"#fff", width:"28px", height:"28px", borderRadius:"8px",
+        fontSize:"14px", display:"flex", alignItems:"center", justifyContent:"center"
+      }}>✕</button>
     </div>
   );
 }

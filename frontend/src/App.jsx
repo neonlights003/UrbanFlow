@@ -12,7 +12,7 @@ import RfidManager from "./components/RfidManager";
 
 export default function App() {
   const [slots, setSlots] = useState({
-    A1:"FREE", A2:"FREE", A3:"FREE", A4:"FREE", A5:"FREE"
+    A1:"FREE", A2:"FREE", A3:"FREE", A4:"FREE"
   });
   const [gateStatus, setGateStatus] = useState("CLOSED");
   const [events, setEvents]         = useState([]);
@@ -36,7 +36,6 @@ export default function App() {
     setTimeout(() => setAlert(null), 4000);
   }
 
-  // Load initial state
   useEffect(() => {
     fetch("http://localhost:8000/api/slots")
       .then((r) => r.json())
@@ -45,7 +44,7 @@ export default function App() {
         data.forEach((s) => (map[s.id] = s.status));
         setSlots(map);
       })
-      .catch((e) => console.error("[App] Failed to load slots:", e));
+      .catch(() => {});
 
     fetch("http://localhost:8000/api/anomalies")
       .then((r) => r.json())
@@ -60,97 +59,101 @@ export default function App() {
       setSlots(map);
       return;
     }
-
     if (type === "slot_update") {
       setSlots((prev) => ({ ...prev, [data.slot]: data.status }));
       addEvent("SLOT", `${data.slot} → ${data.status}`);
     }
-
     if (type === "gate_update") {
       setGateStatus(data.status);
       addEvent("GATE", `Gate ${data.status}`);
     }
-
     if (type === "rfid_event") {
-      addEvent(
-        "RFID",
-        `Card ${data.uid.slice(0, 8)}... → ${data.result} (${data.label})`
-      );
+      addEvent("RFID", `${data.uid.slice(0,8)}… → ${data.result} (${data.label})`);
       triggerAlert(data.result, data.uid, data.label);
     }
-
     if (type === "anomaly") {
       setAnomalies((prev) => [data, ...prev.slice(0, 19)]);
-      addEvent("ANOMALY", `${data.code}: ${data.message.slice(0, 40)}...`);
+      addEvent("ANOMALY", `${data.code}: ${data.message.slice(0, 38)}…`);
     }
   }, []);
 
   const connected = useWebSocket(handleMessage);
+  const now = new Date();
 
   return (
-    <div className={`min-h-screen text-white p-6 space-y-4 transition-colors duration-300 ${
-      alert?.type === "DENIED"   ? "bg-red-950"
-      : alert?.type === "GRANTED" ? "bg-green-950"
-      : "bg-gray-950"
-    }`}>
-
+    <div style={{ background: "var(--bg-base)", minHeight: "100vh", padding: "24px" }}>
       <AccessAlert alert={alert} onDismiss={() => setAlert(null)} />
       <RfidManager isOpen={showRfidManager} onClose={() => setShowRfidManager(false)} />
 
-      {/* Header */}
-      <div className="flex justify-between items-center">
+      {/* ── Header ─────────────────────────────── */}
+      <header style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"24px" }}>
         <div>
-          <h1 className="text-3xl font-bold text-green-400 tracking-tight">
-            Urban Flow
-          </h1>
-          <p className="text-gray-500 text-sm mt-0.5">
+          <div style={{ display:"flex", alignItems:"center", gap:"10px", marginBottom:"4px" }}>
+            <div style={{
+              width:"32px", height:"32px", borderRadius:"8px",
+              background:"linear-gradient(135deg,#d97706,#92400e)",
+              display:"flex", alignItems:"center", justifyContent:"center",
+              fontSize:"16px"
+            }}>🅿</div>
+            <h1 style={{ fontSize:"22px", fontWeight:"700", color:"var(--text-primary)", letterSpacing:"-0.02em" }}>
+              Urban Flow
+            </h1>
+          </div>
+          <p style={{ fontSize:"12px", color:"var(--text-muted)", marginLeft:"42px" }}>
             Smart Parking Management System
           </p>
         </div>
-        <div className="flex items-center gap-3">
+
+        <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
+          {/* Date */}
+          <span style={{ fontSize:"12px", color:"var(--text-muted)" }}>
+            {now.toLocaleDateString("en-IN",{ weekday:"short", day:"numeric", month:"short" })}
+          </span>
+
+          {/* Manage RFID */}
           <button
             onClick={() => setShowRfidManager(true)}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold bg-blue-900/50 border border-blue-700 text-blue-400 hover:bg-blue-800/50 transition-colors"
+            className="btn-amber"
+            style={{ padding:"7px 14px", borderRadius:"10px", fontSize:"12px", fontWeight:"500", cursor:"pointer" }}
           >
             💳 Manage RFIDs
           </button>
-          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold border ${
-            connected
-              ? "bg-green-950 border-green-700 text-green-400"
-              : "bg-red-950 border-red-700 text-red-400"
-          }`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${
-              connected ? "bg-green-400 animate-pulse" : "bg-red-400"
-            }`}/>
-            {connected ? "LIVE" : "CONNECTING..."}
-          </div>
-          <div className="text-xs text-gray-600">
-            {new Date().toLocaleDateString("en-IN", {
-              weekday:"short", day:"numeric", month:"short"
-            })}
+
+          {/* Live badge */}
+          <div style={{
+            display:"flex", alignItems:"center", gap:"6px",
+            padding:"7px 12px", borderRadius:"10px", fontSize:"11px", fontWeight:"600",
+            background: connected ? "rgba(16,185,129,0.08)" : "rgba(239,68,68,0.08)",
+            border: `1px solid ${connected ? "rgba(16,185,129,0.25)" : "rgba(239,68,68,0.25)"}`,
+            color: connected ? "var(--green)" : "var(--red)",
+            letterSpacing:"0.08em"
+          }}>
+            <span style={{
+              width:"6px", height:"6px", borderRadius:"50%",
+              background: connected ? "var(--green)" : "var(--red)"
+            }} className={connected ? "pulse-green" : ""} />
+            {connected ? "LIVE" : "OFFLINE"}
           </div>
         </div>
+      </header>
+
+      {/* ── Stats Row ──────────────────────────── */}
+      <div style={{ marginBottom:"20px" }}>
+        <StatsRow slots={slots} gateStatus={gateStatus} />
       </div>
 
-      <StatsRow slots={slots} gateStatus={gateStatus} />
-
-      {/* Slot grid + Event feed */}
-      <div className="grid grid-cols-3 gap-4">
-        <div className="col-span-2">
-          <SlotGrid slots={slots} />
-        </div>
-        <div>
-          <EventFeed events={events} />
-        </div>
+      {/* ── Main Grid ──────────────────────────── */}
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 340px", gap:"16px", marginBottom:"16px" }}>
+        <SlotGrid slots={slots} />
+        <EventFeed events={events} />
       </div>
 
-      {/* Chart + Prediction + Anomalies */}
-      <div className="grid grid-cols-3 gap-4">
+      {/* ── Bottom Grid ────────────────────────── */}
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 340px", gap:"16px" }}>
         <OccupancyChart />
         <PredictionPanel slots={slots} />
         <AnomalyFeed anomalies={anomalies} />
       </div>
-
     </div>
   );
 }
