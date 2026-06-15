@@ -210,12 +210,22 @@ class SerialReader:
         _last_rfid[uid] = now
 
         tag = get_tag(uid)
-        if tag and tag["is_active"]:
-            result = "GRANTED"
-            label  = tag["label"]
-        else:
+        
+        # Check if parking is full
+        from database import get_all_slots
+        all_slots = get_all_slots()
+        occupied_count = sum(1 for s in all_slots if s["status"] == "OCCUPIED")
+        is_full = occupied_count >= TOTAL_SLOTS
+
+        if not tag or not tag["is_active"]:
             result = "DENIED"
             label  = "Unknown"
+        elif is_full:
+            result = "DENIED"
+            label  = f"{tag['label']} (Lot Full)"
+        else:
+            result = "GRANTED"
+            label  = tag["label"]
 
         log_rfid(uid, result)
         self.broadcast("rfid_event", {
