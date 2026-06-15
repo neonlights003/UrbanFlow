@@ -7,7 +7,7 @@ from anomaly import check_slot_anomaly, check_lot_full, check_repeated_denial
 # CONFIG — change these three lines only
 # ------------------------------------------------------------------
 DEMO = False   # True = scripted demo sequence (for presentation)
-MOCK = False   # True = random mock, False = real Arduino
+MOCK = True    # ← DEMO MODE: set False to use real Arduino on COM3
 PORT = "COM3"  # Windows COM port for Arduino
 BAUD = 9600    # Matches Arduino Serial.begin(9600)
 TOTAL_SLOTS = 4  # Yashika's hardware has 4 physical bays
