@@ -4,25 +4,21 @@ import { useDedupe } from "./hooks/useDedupe";
 import AccessAlert from "./components/AccessAlert";
 import RfidManager from "./components/RfidManager";
 
-const TOTAL_SLOTS = 4;
+const TOTAL = 4;
 
 export default function App() {
-  const [slotsLeft, setSlotsLeft]   = useState(TOTAL_SLOTS);
+  const [slotsLeft,  setSlotsLeft]  = useState(TOTAL);
   const [gateStatus, setGateStatus] = useState("CLOSED");
-  const [lastCard, setLastCard]     = useState(null); // { uid, result, label }
-  const [events, setEvents]         = useState([]);
-  const [alert, setAlert]           = useState(null);
-  const [showRfidManager, setShowRfidManager] = useState(false);
+  const [lastCard,   setLastCard]   = useState(null);
+  const [events,     setEvents]     = useState([]);
+  const [alert,      setAlert]      = useState(null);
+  const [showRfid,   setShowRfid]   = useState(false);
 
   const isDuplicate = useDedupe(800);
 
   function addEvent(type, text) {
-    const key = `${type}:${text}`;
-    if (isDuplicate(key)) return;
-    setEvents(prev => [
-      { type, text, time: new Date().toLocaleTimeString() },
-      ...prev.slice(0, 49),
-    ]);
+    if (isDuplicate(`${type}:${text}`)) return;
+    setEvents(prev => [{ type, text, time: new Date().toLocaleTimeString() }, ...prev.slice(0,49)]);
   }
 
   function triggerAlert(type, uid, label) {
@@ -31,29 +27,22 @@ export default function App() {
   }
 
   useEffect(() => {
-    fetch("http://localhost:8000/api/slots")
-      .then(r => r.json())
-      .then(data => {
-        const occupied = data.filter(s => s.status === "OCCUPIED").length;
-        setSlotsLeft(TOTAL_SLOTS - occupied);
-      })
-      .catch(() => {});
+    fetch("http://localhost:8000/api/slots").then(r => r.json()).then(data => {
+      const occ = data.filter(s => s.status === "OCCUPIED").length;
+      setSlotsLeft(TOTAL - occ);
+    }).catch(() => {});
   }, []);
 
   const handleMessage = useCallback((type, data) => {
     if (type === "init") {
-      const occupied = data.slots.filter(s => s.status === "OCCUPIED").length;
-      setSlotsLeft(TOTAL_SLOTS - occupied);
+      setSlotsLeft(TOTAL - data.slots.filter(s => s.status === "OCCUPIED").length);
       return;
     }
     if (type === "slot_update") {
-      // Recount available from all current slots
-      // Backend will broadcast each slot; we just track occupied count
-      setSlotsLeft(prev => {
-        if (data.status === "OCCUPIED") return Math.max(0, prev - 1);
-        if (data.status === "FREE")     return Math.min(TOTAL_SLOTS, prev + 1);
-        return prev;
-      });
+      setSlotsLeft(prev =>
+        data.status === "OCCUPIED" ? Math.max(0, prev - 1) :
+        data.status === "FREE"     ? Math.min(TOTAL, prev + 1) : prev
+      );
       addEvent("SLOT", data.status === "OCCUPIED" ? "Vehicle entered — slot taken" : "Vehicle exited — slot freed");
     }
     if (type === "gate_update") {
@@ -65,17 +54,15 @@ export default function App() {
       addEvent("RFID", `Card ${data.uid} — ${data.result}`);
       triggerAlert(data.result, data.uid, data.label);
     }
-    if (type === "anomaly") {
-      addEvent("ANOMALY", data.message?.slice(0, 50));
-    }
+    if (type === "anomaly") addEvent("ANOMALY", data.message?.slice(0, 50));
   }, []);
 
   const connected = useWebSocket(handleMessage);
-  const occupied  = TOTAL_SLOTS - slotsLeft;
+  const occupied  = TOTAL - slotsLeft;
   const full      = slotsLeft === 0;
   const gateOpen  = gateStatus === "OPENED";
 
-  const eventConfig = {
+  const eventIcons = {
     SLOT:    { icon: "▣", color: "#60a5fa" },
     RFID:    { icon: "◈", color: "#f59e0b" },
     GATE:    { icon: "◉", color: "#a78bfa" },
@@ -83,208 +70,246 @@ export default function App() {
   };
 
   return (
-    <div style={{
-      minHeight: "100vh",
-      background: "var(--bg-base)",
-      padding: "28px 32px",
-      fontFamily: "Inter, sans-serif",
-    }}>
-      <AccessAlert alert={alert} onDismiss={() => setAlert(null)} />
-      <RfidManager isOpen={showRfidManager} onClose={() => setShowRfidManager(false)} />
-
-      {/* ── Header ─────────────────────────────────────────── */}
-      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"32px" }}>
-        <div style={{ display:"flex", alignItems:"center", gap:"12px" }}>
-          <div style={{
-            width:"40px", height:"40px", borderRadius:"10px",
-            background:"linear-gradient(135deg,#d97706,#92400e)",
-            display:"flex", alignItems:"center", justifyContent:"center",
-            fontSize:"20px"
-          }}>🅿</div>
-          <div>
-            <h1 style={{ fontSize:"20px", fontWeight:"800", color:"var(--text-primary)", letterSpacing:"-0.03em", lineHeight:1 }}>
-              Urban Flow
-            </h1>
-            <p style={{ fontSize:"11px", color:"var(--text-muted)", marginTop:"2px" }}>Smart Parking · Live Dashboard</p>
-          </div>
-        </div>
-
-        <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
-          <button
-            onClick={() => setShowRfidManager(true)}
-            className="btn-amber"
-            style={{ padding:"8px 14px", borderRadius:"10px", fontSize:"12px", fontWeight:"600", cursor:"pointer" }}
-          >
-            💳 Manage RFIDs
-          </button>
-          <div style={{
-            display:"flex", alignItems:"center", gap:"6px",
-            padding:"8px 14px", borderRadius:"10px", fontSize:"11px", fontWeight:"700",
-            background: connected ? "rgba(16,185,129,0.08)" : "rgba(239,68,68,0.08)",
-            border: `1px solid ${connected ? "rgba(16,185,129,0.25)" : "rgba(239,68,68,0.25)"}`,
-            color: connected ? "var(--green)" : "var(--red)",
-            letterSpacing:"0.08em"
-          }}>
-            <span style={{
-              width:"6px", height:"6px", borderRadius:"50%",
-              background: connected ? "var(--green)" : "var(--red)"
-            }} className={connected ? "pulse-green" : ""} />
-            {connected ? "LIVE" : "OFFLINE"}
-          </div>
-        </div>
+    <>
+      {/* Ambient background */}
+      <div className="bg-scene">
+        <div className="bg-grid" />
+        <div className="bg-orb-mid" />
       </div>
 
-      {/* ── 3 Hero Cards ───────────────────────────────────── */}
-      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:"16px", marginBottom:"20px" }}>
+      <div style={{ position:"relative", zIndex:1, minHeight:"100vh", padding:"28px 32px" }}>
+        <AccessAlert alert={alert} onDismiss={() => setAlert(null)} />
+        <RfidManager isOpen={showRfid} onClose={() => setShowRfid(false)} />
 
-        {/* Slots Left */}
-        <div className="card" style={{
-          padding:"32px 28px",
-          background: full ? "rgba(239,68,68,0.06)" : "var(--bg-surface)",
-          borderColor: full ? "rgba(239,68,68,0.25)" : "var(--border)",
-        }}>
-          <p style={{ fontSize:"11px", color:"var(--text-muted)", fontWeight:"600", letterSpacing:"0.1em", marginBottom:"16px" }}>
-            SLOTS AVAILABLE
-          </p>
-          <p style={{
-            fontSize:"80px", fontWeight:"900", lineHeight:1, letterSpacing:"-0.05em",
-            color: full ? "#f87171" : slotsLeft === 1 ? "#f59e0b" : "#34d399",
-          }}>
-            {slotsLeft}
-          </p>
-          <p style={{ fontSize:"13px", color:"var(--text-muted)", marginTop:"8px" }}>
-            {full ? "🔴 Parking full" : `of ${TOTAL_SLOTS} total · ${occupied} occupied`}
-          </p>
-          {/* Mini bay visual */}
-          <div style={{ display:"flex", gap:"6px", marginTop:"16px" }}>
-            {Array.from({length: TOTAL_SLOTS}).map((_, i) => (
-              <div key={i} style={{
-                flex:1, height:"6px", borderRadius:"99px",
-                background: i < occupied ? "#f87171" : "rgba(52,211,153,0.3)",
-                transition:"background 0.4s"
-              }} />
-            ))}
+        {/* ── Header ─────────────────────────────────── */}
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"32px" }}>
+          <div style={{ display:"flex", alignItems:"center", gap:"14px" }}>
+            {/* Logo badge */}
+            <div style={{
+              width:"44px", height:"44px", borderRadius:"14px",
+              background:"linear-gradient(135deg,rgba(217,119,6,0.9),rgba(146,64,14,0.9))",
+              border:"1px solid rgba(245,158,11,0.3)",
+              display:"flex", alignItems:"center", justifyContent:"center",
+              fontSize:"22px", boxShadow:"0 4px 20px rgba(217,119,6,0.25)",
+              backdropFilter:"blur(10px)"
+            }}>🅿</div>
+            <div>
+              <h1 style={{
+                fontSize:"22px", fontWeight:"900", letterSpacing:"-0.04em", lineHeight:1,
+                background:"linear-gradient(135deg,#fff 40%,rgba(255,255,255,0.55))",
+                WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent"
+              }}>Urban Flow</h1>
+              <p style={{ fontSize:"11px", color:"var(--text-3)", marginTop:"3px", letterSpacing:"0.04em" }}>
+                Smart Parking Management System
+              </p>
+            </div>
+          </div>
+
+          <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
+            <button onClick={() => setShowRfid(true)} className="btn-amber"
+              style={{ padding:"9px 16px", borderRadius:"12px", fontSize:"12px" }}>
+              💳 Manage RFIDs
+            </button>
+            <div style={{
+              display:"flex", alignItems:"center", gap:"7px",
+              padding:"9px 16px", borderRadius:"12px", fontSize:"11px", fontWeight:"700",
+              background: connected ? "rgba(16,185,129,0.08)" : "rgba(239,68,68,0.08)",
+              border: `1px solid ${connected ? "rgba(16,185,129,0.2)" : "rgba(239,68,68,0.2)"}`,
+              color: connected ? "#34d399" : "#f87171",
+              backdropFilter:"blur(12px)", letterSpacing:"0.08em"
+            }}>
+              <span style={{
+                width:"6px", height:"6px", borderRadius:"50%",
+                background: connected ? "#34d399" : "#f87171"
+              }} className={connected ? "pulse-green" : ""} />
+              {connected ? "LIVE" : "OFFLINE"}
+            </div>
           </div>
         </div>
 
-        {/* Gate Status */}
-        <div className="card" style={{
-          padding:"32px 28px",
-          background: gateOpen ? "rgba(16,185,129,0.06)" : "rgba(217,119,6,0.04)",
-          borderColor: gateOpen ? "rgba(16,185,129,0.25)" : "rgba(217,119,6,0.15)",
-        }}>
-          <p style={{ fontSize:"11px", color:"var(--text-muted)", fontWeight:"600", letterSpacing:"0.1em", marginBottom:"16px" }}>
-            GATE STATUS
-          </p>
-          <div style={{ fontSize:"52px", marginBottom:"8px" }}>
-            {gateOpen ? "🔓" : "🔒"}
-          </div>
-          <p style={{
-            fontSize:"36px", fontWeight:"900", lineHeight:1, letterSpacing:"-0.04em",
-            color: gateOpen ? "#34d399" : "#f59e0b",
-          }}>
-            {gateOpen ? "OPEN" : "CLOSED"}
-          </p>
-          <p style={{ fontSize:"13px", color:"var(--text-muted)", marginTop:"8px" }}>
-            {gateOpen ? "Vehicle in transit" : "Barrier secured"}
-          </p>
-        </div>
+        {/* ── 3 Hero Cards ───────────────────────────── */}
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:"16px", marginBottom:"16px" }}>
 
-        {/* Last RFID Card */}
-        <div className="card" style={{
-          padding:"32px 28px",
-          background: lastCard?.result === "GRANTED"
-            ? "rgba(16,185,129,0.06)"
-            : lastCard?.result === "DENIED"
-            ? "rgba(239,68,68,0.06)"
-            : "var(--bg-surface)",
-          borderColor: lastCard?.result === "GRANTED"
-            ? "rgba(16,185,129,0.25)"
-            : lastCard?.result === "DENIED"
-            ? "rgba(239,68,68,0.25)"
-            : "var(--border)",
-        }}>
-          <p style={{ fontSize:"11px", color:"var(--text-muted)", fontWeight:"600", letterSpacing:"0.1em", marginBottom:"16px" }}>
-            LAST RFID SCAN
-          </p>
-          {lastCard ? (
-            <>
-              <p style={{
-                fontSize:"28px", fontWeight:"900", letterSpacing:"0.05em",
-                fontFamily:"monospace", color:"var(--amber-light)", lineHeight:1, marginBottom:"8px",
-                wordBreak:"break-all"
-              }}>
-                {lastCard.uid}
-              </p>
-              <div style={{
-                display:"inline-flex", alignItems:"center", gap:"6px",
-                padding:"4px 12px", borderRadius:"99px", fontSize:"12px", fontWeight:"700",
-                background: lastCard.result === "GRANTED" ? "rgba(16,185,129,0.15)" : "rgba(239,68,68,0.15)",
-                color: lastCard.result === "GRANTED" ? "#34d399" : "#f87171",
-                letterSpacing:"0.05em"
-              }}>
-                {lastCard.result === "GRANTED" ? "✓" : "✕"} {lastCard.result}
-              </div>
-              <p style={{ fontSize:"12px", color:"var(--text-muted)", marginTop:"8px" }}>{lastCard.label}</p>
-            </>
-          ) : (
-            <>
-              <p style={{ fontSize:"28px", color:"var(--text-muted)", letterSpacing:"0.1em", fontFamily:"monospace", marginBottom:"8px" }}>
-                — — — —
-              </p>
-              <p style={{ fontSize:"12px", color:"var(--text-muted)" }}>Waiting for card scan…</p>
-            </>
-          )}
-        </div>
+          {/* — Slots Left — */}
+          <div className={`glass-hero ${full ? "glow-red" : ""}`}
+            style={{ padding:"32px 28px" }}>
+            {/* Inner glow */}
+            <div style={{
+              position:"absolute", top:"-40px", right:"-20px",
+              width:"160px", height:"160px", borderRadius:"50%",
+              background: full
+                ? "radial-gradient(circle, rgba(239,68,68,0.12) 0%, transparent 70%)"
+                : "radial-gradient(circle, rgba(16,185,129,0.08) 0%, transparent 70%)",
+              pointerEvents:"none"
+            }} />
 
-      </div>
+            <p className="label" style={{ marginBottom:"20px" }}>SLOTS AVAILABLE</p>
 
-      {/* ── Event Feed ──────────────────────────────────────── */}
-      <div className="card" style={{ padding:"20px" }}>
-        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"14px" }}>
-          <span style={{ fontSize:"11px", color:"var(--text-muted)", fontWeight:"600", letterSpacing:"0.1em" }}>
-            LIVE EVENT LOG
-          </span>
-          <span style={{
-            fontSize:"10px", color:"var(--amber-light)", fontWeight:"600",
-            padding:"2px 8px", borderRadius:"99px",
-            background:"var(--amber-glow)", border:"1px solid rgba(217,119,6,0.2)"
-          }}>
-            {events.length} events
-          </span>
-        </div>
-
-        <div className="event-scroll" style={{
-          display:"flex", flexDirection:"column", gap:"4px",
-          maxHeight:"220px", overflowY:"auto"
-        }}>
-          {events.length === 0 ? (
-            <p style={{ color:"var(--text-muted)", fontSize:"12px", textAlign:"center", padding:"24px 0" }}>
-              Waiting for events…
+            <p style={{
+              fontSize:"88px", fontWeight:"900", lineHeight:1, letterSpacing:"-0.05em",
+            }} className={full ? "num-red" : slotsLeft === 1 ? "num-amber" : "num-green"}>
+              {slotsLeft}
             </p>
-          ) : events.map((e, i) => {
-            const cfg = eventConfig[e.type] || eventConfig.SLOT;
-            return (
-              <div key={i} style={{
-                display:"flex", alignItems:"center", gap:"12px",
-                padding:"8px 10px", borderRadius:"8px",
-                background: i === 0 ? `${cfg.color}12` : "transparent",
-              }}>
-                <span style={{
-                  width:"24px", height:"24px", borderRadius:"6px",
-                  background:`${cfg.color}14`, color:cfg.color,
-                  display:"flex", alignItems:"center", justifyContent:"center",
-                  fontSize:"11px", flexShrink:0
-                }}>{cfg.icon}</span>
-                <span style={{ flex:1, fontSize:"13px", color:"var(--text-primary)", fontWeight:"500" }}>
-                  {e.text}
-                </span>
-                <span style={{ fontSize:"10px", color:"var(--text-muted)", flexShrink:0 }}>{e.time}</span>
-              </div>
-            );
-          })}
+
+            <p style={{ fontSize:"13px", color:"var(--text-2)", marginTop:"10px" }}>
+              {full ? "🔴 Parking lot full" : `of ${TOTAL} bays · ${occupied} occupied`}
+            </p>
+
+            {/* Mini bay strip */}
+            <div style={{ display:"flex", gap:"6px", marginTop:"20px" }}>
+              {Array.from({length:TOTAL}).map((_,i) => (
+                <div key={i} style={{
+                  flex:1, height:"4px", borderRadius:"99px",
+                  background: i < occupied
+                    ? "linear-gradient(90deg,#f87171,#ef4444)"
+                    : "rgba(52,211,153,0.2)",
+                  transition:"background 0.5s",
+                  boxShadow: i < occupied ? "0 0 6px rgba(239,68,68,0.4)" : "none"
+                }} />
+              ))}
+            </div>
+          </div>
+
+          {/* — Gate — */}
+          <div className={`glass-hero ${gateOpen ? "glow-green" : ""}`}
+            style={{ padding:"32px 28px" }}>
+            <div style={{
+              position:"absolute", bottom:"-30px", left:"50%", transform:"translateX(-50%)",
+              width:"200px", height:"120px", borderRadius:"50%",
+              background: gateOpen
+                ? "radial-gradient(circle, rgba(16,185,129,0.1) 0%, transparent 70%)"
+                : "radial-gradient(circle, rgba(245,158,11,0.06) 0%, transparent 70%)",
+              pointerEvents:"none"
+            }} />
+
+            <p className="label" style={{ marginBottom:"20px" }}>GATE STATUS</p>
+
+            <div style={{
+              width:"60px", height:"60px", borderRadius:"18px",
+              background: gateOpen ? "rgba(16,185,129,0.12)" : "rgba(245,158,11,0.1)",
+              border: `1px solid ${gateOpen ? "rgba(16,185,129,0.25)" : "rgba(245,158,11,0.2)"}`,
+              display:"flex", alignItems:"center", justifyContent:"center",
+              fontSize:"26px", marginBottom:"16px",
+              boxShadow: gateOpen ? "0 0 20px rgba(16,185,129,0.15)" : "none"
+            }}>
+              {gateOpen ? "🔓" : "🔒"}
+            </div>
+
+            <p style={{
+              fontSize:"44px", fontWeight:"900", lineHeight:1, letterSpacing:"-0.04em",
+            }} className={gateOpen ? "num-green" : "num-amber"}>
+              {gateOpen ? "OPEN" : "CLOSED"}
+            </p>
+
+            <p style={{ fontSize:"13px", color:"var(--text-2)", marginTop:"10px" }}>
+              {gateOpen ? "Vehicle in transit" : "Barrier secured"}
+            </p>
+          </div>
+
+          {/* — Last RFID — */}
+          <div className={`glass-hero ${
+            lastCard?.result === "GRANTED" ? "glow-green" :
+            lastCard?.result === "DENIED"  ? "glow-red"   : ""
+          }`} style={{ padding:"32px 28px" }}>
+            <div style={{
+              position:"absolute", top:"-20px", left:"-20px",
+              width:"180px", height:"180px", borderRadius:"50%",
+              background:"radial-gradient(circle, rgba(245,158,11,0.07) 0%, transparent 70%)",
+              pointerEvents:"none"
+            }} />
+
+            <p className="label" style={{ marginBottom:"20px" }}>LAST RFID SCAN</p>
+
+            {lastCard ? (
+              <>
+                <p style={{
+                  fontSize:"32px", fontWeight:"900", letterSpacing:"0.06em",
+                  fontFamily:"'Courier New', monospace", lineHeight:1, marginBottom:"14px",
+                  wordBreak:"break-all"
+                }} className="num-mono">{lastCard.uid}</p>
+
+                <div style={{
+                  display:"inline-flex", alignItems:"center", gap:"7px",
+                  padding:"6px 14px", borderRadius:"99px", fontSize:"12px", fontWeight:"700",
+                  background: lastCard.result==="GRANTED"
+                    ? "rgba(16,185,129,0.15)" : "rgba(239,68,68,0.15)",
+                  border: `1px solid ${lastCard.result==="GRANTED"
+                    ? "rgba(16,185,129,0.3)" : "rgba(239,68,68,0.3)"}`,
+                  color: lastCard.result==="GRANTED" ? "#34d399" : "#f87171",
+                  boxShadow: lastCard.result==="GRANTED"
+                    ? "0 0 16px rgba(16,185,129,0.15)" : "0 0 16px rgba(239,68,68,0.15)",
+                  letterSpacing:"0.04em", marginBottom:"10px"
+                }}>
+                  {lastCard.result==="GRANTED" ? "✓" : "✕"} {lastCard.result}
+                </div>
+
+                <p style={{ fontSize:"12px", color:"var(--text-2)", marginTop:"6px" }}>
+                  {lastCard.label}
+                </p>
+              </>
+            ) : (
+              <>
+                <p style={{
+                  fontSize:"32px", letterSpacing:"0.15em", fontFamily:"monospace",
+                  color:"var(--text-3)", marginBottom:"14px"
+                }}>— — — —</p>
+                <p style={{ fontSize:"12px", color:"var(--text-3)" }}>Awaiting card scan…</p>
+              </>
+            )}
+          </div>
         </div>
+
+        {/* ── Event Feed ────────────────────────────── */}
+        <div className="glass" style={{ padding:"22px 24px" }}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"16px" }}>
+            <p className="label">LIVE EVENT LOG</p>
+            <span style={{
+              fontSize:"10px", fontWeight:"700",
+              padding:"3px 10px", borderRadius:"99px",
+              background:"rgba(245,158,11,0.1)",
+              border:"1px solid rgba(245,158,11,0.2)",
+              color:"var(--amber)"
+            }}>{events.length} events</span>
+          </div>
+
+          <div style={{ display:"flex", flexDirection:"column", gap:"2px", maxHeight:"240px", overflowY:"auto" }}>
+            {events.length === 0 ? (
+              <p style={{ textAlign:"center", color:"var(--text-3)", fontSize:"13px", padding:"32px 0" }}>
+                Waiting for events…
+              </p>
+            ) : events.map((e, i) => {
+              const cfg = eventIcons[e.type] || eventIcons.SLOT;
+              return (
+                <div key={i} className={i===0?"fade-up":""} style={{
+                  display:"flex", alignItems:"center", gap:"12px",
+                  padding:"9px 12px", borderRadius:"12px",
+                  background: i===0 ? `${cfg.color}0d` : "transparent",
+                  transition:"background 0.3s"
+                }}>
+                  <div style={{
+                    width:"28px", height:"28px", borderRadius:"8px", flexShrink:0,
+                    background:`${cfg.color}12`,
+                    border:`1px solid ${cfg.color}25`,
+                    display:"flex", alignItems:"center", justifyContent:"center",
+                    fontSize:"12px", color:cfg.color
+                  }}>{cfg.icon}</div>
+                  <span style={{ flex:1, fontSize:"13px", color:"var(--text-1)", fontWeight:"500" }}>
+                    {e.text}
+                  </span>
+                  <span style={{ fontSize:"10px", color:"var(--text-3)", flexShrink:0, fontFamily:"monospace" }}>
+                    {e.time}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <p style={{ textAlign:"center", fontSize:"10px", color:"var(--text-3)", marginTop:"20px", letterSpacing:"0.08em" }}>
+          URBAN FLOW · SMART PARKING MANAGEMENT · {new Date().getFullYear()}
+        </p>
       </div>
-    </div>
+    </>
   );
 }
